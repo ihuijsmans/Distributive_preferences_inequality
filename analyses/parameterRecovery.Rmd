@@ -1,0 +1,201 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+```{r libraries, message=FALSE, warning=FALSE}
+
+options(repos = c(CRAN = "http://cran.rstudio.com"))
+#install.packages('lme4', dependencies=TRUE, repos='https://ftp.ussg.iu.edu/CRAN/')
+
+require(ggplot2)
+require(plyr)      # for ddply()
+require(tidyr)     #for long to wide, gather & spread <3
+require(extrafont)
+
+options(digits=20)
+#loadfonts(device="win")
+
+#Clean wd
+rm(list=ls())
+
+#colors for plots
+twocolors <- c("#0093BA", "#5E9D45")
+threecolors <- c("#ba1319", "#f36f21", "#fff100")  
+sevencolors <- c('#C70039','#FF5733', '#FF8D1A','#FFC300', '#EDDD53', '#ADD45C','#57C785')
+
+#Set wd
+wd <- '/Users/rhmhuijsmans/Desktop/mac_Harvard/Donders/experiment_3_DG_UG/'
+
+plotsdir <- paste(wd, '/plots/', sep = '')
+dir.create(plotsdir)
+
+#load data function
+datareader <- function(x){
+  data_new <- read.table(as.character(x[,'filenames']), sep = ",", header = TRUE)
+  return(data_new)
+}
+
+paramdir <- 'analyses/results/parameterrecovery3/'
+filenamesParamRecov <- list.files(paste(wd, paramdir, sep = ''))
+datafilesaramRecov <- data.frame(filenames = paste(wd,paramdir,filenamesParamRecov, sep = ''))
+dataParamRecov<- ddply(datafilesaramRecov, .(filenames), datareader)
+
+
+
+
+```
+
+#Parameter estimation:
+#Make a plot with true phi x axis and recovered phi y axis
+Phi
+
+```{r plot true vs recov params, Phi}
+
+saveP <-
+ggplot(dataParamRecov, aes(recovPhi, truePhi)) + geom_point() + 
+  theme_bw() + labs(y = 'True Phi', x = 'Recovered Phi') +
+  theme(text=element_text(size=20, family="Times New Roman"), strip.background =element_blank(), panel.grid.major = element_blank(), legend.position = 'none')
+saveP
+rcorr(dataParamRecov$recovPhi, dataParamRecov$truePhi)
+
+ggsave(file=sprintf("%s/ParamRecov_Phi.jpg", plotsdir), plot=saveP, width=5, height=5)
+
+```
+
+Theta
+
+```{r plot true vs recov params, theta}
+
+saveP <-
+ggplot(dataParamRecov, aes(recovTheta, trueTheta)) + geom_point() + 
+  theme_bw() + labs(y = 'True Theta', x = 'Recovered Theta', color = 'True Phi') +
+  theme(text=element_text(size=20, family="Times New Roman"), strip.background =element_blank(), panel.grid.major = element_blank())
+saveP
+rcorr(dataParamRecov$recovTheta, dataParamRecov$trueTheta)
+
+ggsave(file=sprintf("%s/ParamRecov_Theta.jpg", plotsdir), plot=saveP, width=7, height=5)
+
+saveP <-
+ggplot(dataParamRecov, aes(recovTheta, trueTheta, color = truePhi)) + geom_point(size = 4) + 
+  theme_bw() + labs(y = 'True Theta', x = 'Recovered Theta', color = 'True Phi') +
+  theme(text=element_text(size=20, family="Times New Roman"), strip.background =element_blank(), panel.grid.major = element_blank())
+saveP
+rcorr(dataParamRecov$recovTheta, dataParamRecov$trueTheta)
+
+ggsave(file=sprintf("%s/ParamRecov_Theta_phi.jpg", plotsdir), plot=saveP, width=7, height=5)
+
+
+```
+
+That's not great, would that be related to phi? It seems likely that the model sucks at estimating socialness (theta) at high greed levels (phi). 
+This seems to be the case, theta is somewhat random for phi > 7.5 it has problems esimating true theta
+
+```{r diff theta ~ phi}
+
+dataParamRecov$diffTheta <- dataParamRecov$trueTheta - dataParamRecov$recovTheta
+dataParamRecov[dataParamRecov$diffTheta> 2.5,]$truePhi
+
+dataParamRecov$truePhi_8 <- '> 4'
+dataParamRecov[dataParamRecov$truePhi < 0.5, ]$truePhi_8 <- '< 4'
+
+saveP <-
+ggplot(dataParamRecov, aes(diffTheta, truePhi, fill = truePhi_8)) + geom_point(size = 3, shape = 21) + 
+  theme_bw() + labs(y = 'True Phi', x = 'True Theta - Recovered Theta', fill = 'True phi:') +
+  geom_hline(yintercept = 0.5) + 
+  scale_fill_manual(values = twocolors) +
+  theme(text=element_text(size=20, family="Times New Roman"), strip.background =element_blank(), panel.grid.major = element_blank(), legend.position = 'right',
+  legend.title = element_text(size = 14),
+  legend.text = element_text(size = 14)
+  )
+saveP
+
+phihigh7 <- subset(dataParamRecov, truePhi_8 == '> 4')
+philow7 <- subset(dataParamRecov, truePhi_8 == '< 4')
+
+rcorr(phihigh7$recovTheta, phihigh7$trueTheta)
+rcorr(philow7$recovTheta, philow7$trueTheta)
+
+
+ggsave(file=sprintf("%s/ParamRecov_DiffTheta_Phi.jpg", plotsdir), plot=saveP, width=6, height=5)
+
+
+```
+
+
+####Based on 1 trial
+
+Phi
+
+```{r plot true vs recov params Phi 1 trial}
+
+saveP <-
+ggplot(dataParamRecov1, aes(recovPhi, truePhi)) + geom_point() + 
+  theme_bw() + labs(y = 'True Phi', x = 'Recovered Phi') +
+  theme(text=element_text(size=20, family="Times New Roman"), strip.background =element_blank(), panel.grid.major = element_blank(), legend.position = 'none')
+saveP
+rcorr(dataParamRecov1$recovPhi, dataParamRecov1$truePhi)
+
+ggsave(file=sprintf("%s/ParamRecov_Phi_1trial.jpg", plotsdir), plot=saveP, width=5, height=5)
+
+```
+
+Theta
+
+```{r plot true vs recov params theta 1 trial}
+
+saveP <-
+ggplot(dataParamRecov1, aes(recovTheta, trueTheta)) + geom_point() + 
+  theme_bw() + labs(y = 'True Theta', x = 'Recovered Theta', color = 'True Phi') +
+  theme(text=element_text(size=20, family="Times New Roman"), strip.background =element_blank(), panel.grid.major = element_blank())
+saveP
+rcorr(dataParamRecov1$recovTheta, dataParamRecov1$trueTheta)
+
+ggsave(file=sprintf("%s/ParamRecov_Theta_1trial.jpg", plotsdir), plot=saveP, width=5, height=5)
+
+saveP <-
+ggplot(dataParamRecov1, aes(recovTheta, trueTheta, color = truePhi)) + geom_point(size = 4) + 
+  theme_bw() + labs(y = 'True Theta', x = 'Recovered Theta', color = 'True Phi') +
+  theme(text=element_text(size=20, family="Times New Roman"), strip.background =element_blank(), panel.grid.major = element_blank())
+saveP
+rcorr(dataParamRecov1$recovTheta, dataParamRecov1$trueTheta)
+
+ggsave(file=sprintf("%s/ParamRecov_Theta_phi_1trial.jpg", plotsdir), plot=saveP, width=7, height=5)
+
+
+```
+
+```{r diff theta ~ phi 1 trial}
+
+dataParamRecov1$diffTheta <- dataParamRecov1$trueTheta - dataParamRecov1$recovTheta
+dataParamRecov1[dataParamRecov1$diffTheta> 2.5,]$truePhi
+
+phiLimit <- 4
+
+dataParamRecov1$truePhi_x <- sprintf('> %.2f', phiLimit)
+dataParamRecov1[dataParamRecov1$truePhi < phiLimit, ]$truePhi_x <-  sprintf('< %.2f', phiLimit)
+
+saveP <-
+ggplot(dataParamRecov1, aes(diffTheta, truePhi, fill = truePhi_x)) + geom_point(size = 3, shape = 21) + 
+  theme_bw() + labs(y = 'True Phi', x = 'True Theta - Recovered Theta', fill = 'True phi:') +
+  geom_hline(yintercept = phiLimit) + 
+  scale_fill_manual(values = twocolors) +
+  theme(text=element_text(size=20, family="Times New Roman"), strip.background =element_blank(), panel.grid.major = element_blank(), legend.position = 'right',
+  legend.title = element_text(size = 14),
+  legend.text = element_text(size = 14)
+  )
+saveP
+
+phihighx <- subset(dataParamRecov1, truePhi_x == sprintf('> %.2f', phiLimit))
+philowx <- subset(dataParamRecov1, truePhi_x == sprintf('< %.2f', phiLimit))
+
+rcorr(phihighx$recovTheta, phihighx$trueTheta)
+rcorr(philowx$recovTheta, philowx$trueTheta)
+
+
+ggsave(file=sprintf("%s/ParamRecov_DiffTheta_Phi_%.2f_1trial.jpg", plotsdir, phiLimit), plot=saveP, width=6, height=5)
+
+
+```
+

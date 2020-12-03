@@ -1,0 +1,323 @@
+---
+Title: 'Load distributor pilot data'
+Author: 'Inge Huijsmans'
+Output: html_notebook
+---
+
+
+
+```{r package loading, message=FALSE, warning=FALSE}
+
+options(repos = c(CRAN = "http://cran.rstudio.com"))
+
+require(ggplot2)
+require(plyr)      # for ddply()
+require(tidyr)     #for long to wide, gather & spread <3
+options(digits=20)
+
+
+rm(list=ls())
+
+
+#Set wd
+#Donders
+#wd <- "P:/3014018.13/experiment_3_DG_UG/"
+#Home
+wd <- '/Users/rhmhuijsmans/Desktop/mac_Harvard/Donders/experiment_3_DG_UG/'
+
+#Load & save environment data
+#load(paste(wd,'data/distributors//workspace_distrExp4.Rdata', sep = ''))
+
+#save.image(paste(wd,'data/distributors//workspace_distrExp4.Rdata', sep = ''))
+
+plotsdir <- paste(wd, 'plots', sep = '')
+dir.create(plotsdir)
+
+
+filenames <- list.files(paste(wd, 'data/distributors/csv/', sep = ''))
+datafiles <- data.frame(filenames = paste(wd,'data/distributors/csv/',filenames, sep = ''))
+
+datareader <- function(x){
+  data_new <- read.table(as.character(x[,'filenames']), sep = ",", header = TRUE)
+  return(data_new)
+}
+
+data <- ddply(datafiles, .(filenames), datareader)
+
+#Order
+data <- data[order(data$ID),]
+
+#Get an idea of # of participants, 187
+length(unique(data$ID))
+length(unique(data$Subject))
+
+
+#20877, 20930
+# Played game twice. Delete
+
+#20966
+# Missed only one offer. Not of interest here anyway, keep. 
+
+#21038
+# Skipped last 10 UD trials. Delete 
+
+#c(20906, 20945, 20993)
+# Did not click on ladder, way too high or too far left
+
+```
+
+
+```{r Preallocating}
+
+data$Value <- as.character(data$Value)
+data$Name <- as.character(data$Name)
+data$event_name <- as.character(data$Name)
+
+names(data)
+
+data <- subset(data, select = c("event_name","Name", "Value","Created", "Subject")) 
+row.names(data) <- 1:nrow(data)
+
+#Preallocate variable names
+gametxtDD <- '_DD_'
+gametxtExpectations <- '_DD_expectation_'
+gameTxtUG <- '_UD_'
+trialNrsDD <- c('practice',0:26)
+trialNrsUD <- as.character(c(27:53))
+trialNrsExpectations <- as.character(c(0:8))
+
+preallocate <- data.frame(trialnr = c(trialNrsDD, trialNrsExpectations, trialNrsUD),
+                          gameTxt = c(rep(gametxtDD, length(trialNrsDD)), 
+                                      rep(gametxtExpectations, length(trialNrsExpectations)),
+                                      rep(gameTxtUG, length(trialNrsUD))),
+                          rownr = c(1:length(c(trialNrsDD, trialNrsExpectations, trialNrsUD))))
+
+preallocate$trialparts <- paste(preallocate$gameTxt, preallocate$trialnr, sep = '')
+
+vars <- c('choiceMe','choiceYou', 'choiceMeStart',
+          'trial', 'pot', 'game', 'offer', 'wealthPP', 'wealthOther', 'RT')
+
+variableNames <- paste(rep(vars, each = length(preallocate$trialparts)), preallocate$trialparts, sep = '')
+
+# Extract experiment data
+expdata <- subset(data, event_name %in% variableNames)
+
+prealdata <- data.frame(event_name = rep(variableNames, length(unique(expdata$Subject))),
+                        Subject = rep(unique(expdata$Subject), each = length(variableNames)))
+
+#Are there people that quit before experiment was over? Yes.
+#table(expdata$Subject) == 640
+
+#This guy played the game twice 20877, 20930
+pS20877 <- subset(data, Subject == 20877)
+pS20930 <- subset(data, Subject == 20930)
+
+nrow(prealdata)
+nrow(expdata)
+
+checkdata <- merge(prealdata, expdata, by = c('Subject', 'event_name'), all = T)
+
+any(!table(checkdata$Subject) == 640)
+
+length(unique(checkdata$Subject))
+
+#Delete him
+checkdata <- subset(checkdata, !(Subject %in% c(20877, 20930)))
+
+```
+
+```{r long to wide}
+
+#That extra 'DD_' in expectation trials is onhandig 
+checkdata$event_name <- gsub("DD_expectation", "expectation", as.character(checkdata$event_name))
+
+#Split event_name [1] = var, [2] =exp section [3] = trialnr
+checkdata$name <- unlist(strsplit(checkdata$event_name, '_'))[seq(1,length(checkdata$event_name)*3,3)]
+checkdata$game <- unlist(strsplit(checkdata$event_name, '_'))[seq(2,length(checkdata$event_name)*3,3)]
+checkdata$trial <- unlist(strsplit(checkdata$event_name, '_'))[seq(3,length(checkdata$event_name)*3,3)]
+checkdata[grepl('expectation', checkdata$event_name) & checkdata$name == 'game',]$Value <- 'expectation'
+
+row.names(checkdata) <- 1:nrow(checkdata)
+
+datalala <- subset(checkdata, select = c('Value','name','trial','game', 'Subject'))
+data_wide <- spread(datalala, name, Value)
+
+```
+
+
+```{r clean}
+
+#What are we missing
+dataNA <- function(x){
+  x$nrNA <- 0
+  x$isNA <- as.numeric(any(is.na(x)))
+  x$nrNA <- sum(is.na(x))
+  return(x)
+}
+
+x<- subset(data_wide, Subject == 21038 & game == 'UD' & trial == 45)
+
+data_wideNA <- ddply(data_wide, .(Subject, game, trial), dataNA)
+
+# Missed only one offer. Not of interest here anyway: 20966
+# Skipped last 10 UD trials. Delete 21038
+
+data_wide <- subset(data_wide, Subject != 21038)
+
+#Kicked out 3 so far.
+length(unique(data_wide$Subject))
+
+
+#clean demographics and data
+orderdemo <- c('age', 'gender','bornUS', 'growupUS', 'growUp', 'liveUS', 'state', 'city', 'livedhere',
+               'clickX', 'clickY', 'education', 'employment','occupation', 'workHours', 'student', 
+               'student-fulltime','major', 'ownIncome', 'houseIncome', 'famIncome',
+               'religion','ethnicity', 'Politics','EnglishNative','MTurkID',
+               'comments','strategy1', 'strategy2', 'strategyEx')
+
+somedemo <- subset(data, event_name %in% orderdemo, select = c('Subject', 'Value','Name'))
+strategy <- subset(data, event_name %in% c('comments','strategy1', 'strategy2', 'strategyEx'), select = c('Subject', 'Value','Name'))
+
+row.names(somedemo)<- 1:nrow(somedemo)
+
+doubles <- function(x){
+  return(x[!(duplicated(x$Name)),])
+}
+
+somedemonodub <- ddply(somedemo, .(Subject), doubles)
+demo_wide <-spread(somedemonodub, Name, Value)
+
+
+demo_wideg <- demo_wide[!is.na(demo_wide$age),]
+
+
+demo_wide$f_ownIncome <- factor(demo_wide$ownIncome, levels = levels(factor(demo_wide$ownIncome)), labels = c(2,3,4,5,6,1,7))
+demo_wide$f_famIncome <- factor(demo_wide$famIncome, levels = levels(factor(demo_wide$famIncome)), labels = c(2,3,4,5,6,1,7))
+demo_wide$f_houseIncome <- factor(demo_wide$houseIncome, levels = levels(factor(demo_wide$houseIncome)), labels = c(2,3,4,5,6,1,7))
+as.numeric.factor <- function(x) {as.numeric(levels(x))[x]}
+demo_wide$n_ownIncome <- as.numeric.factor(demo_wide$f_ownIncome)
+demo_wide$n_famIncome <- as.numeric.factor(demo_wide$f_famIncome)
+demo_wide$n_houseIncome <- as.numeric.factor(demo_wide$f_houseIncome)
+demo_wide$n_SES <- 1-(as.numeric(as.character(demo_wide$clickY))-20)/55
+
+datagsubj <- unique(data_wide$Subject)
+demogsubj <- unique(demo_wide$Subject)
+
+demo_wide <- demo_wide[demo_wide$Subject %in% datagsubj,]
+
+data_demo <- merge(data_wide, demo_wide, by = c('Subject'))
+
+
+#### Delete people who did not pay attention
+
+#this guy did not click on the Yaxis of ladder correctly
+toohigh <- demo_wide[as.numeric(as.character(demo_wide$clickY))>80,]$Subject
+#these guys did not click on the Xaxis of ladder correctly
+toowide <- demo_wide[as.numeric(as.character(demo_wide$clickX))<80,]$Subject
+
+data_demo <- subset(data_demo, !(Subject %in% c(toohigh, toowide)))
+datagsubj <- unique(data_demo$Subject)
+demo_wide <- demo_wide[demo_wide$Subject %in% datagsubj,]
+
+
+#We still have 108 pps :)
+length(unique(data_demo$Subject))
+length(unique(demo_wide$Subject))
+data_demoDistr <- data_demo
+
+
+#Make between Subjects order variable.
+data_demo$order <- ''
+makeOrder <- function(s)
+{
+  s$order <- paste(s[s$game == 'DD' & s$trial == 0,]$wealthPP,
+                         s[s$game == 'DD' & s$trial == 10,]$wealthPP,
+                         s[s$game == 'DD' & s$trial == 20,]$wealthPP, sep = '_')
+  return(s)
+}
+
+#s <- subset(data_demo, Subject == 20966)
+data_demo[data_demo$trial == 0 & data_demo$Subject == 20966,]$game <- 'DD'
+data_demo <- ddply(data_demo, .(Subject), makeOrder)
+data_demo$f_order <- factor(data_demo$order)
+
+
+#Delete practice
+data_demoP <- subset(data_demo, trial == 'practice')
+data_demo <- subset(data_demo, trial != 'practice')
+
+#Clean some last stuff up before the work starts
+data_demo$n_choiceMe <- as.numeric(data_demo$choiceMe)
+data_demo$n_choiceYou <- as.numeric(data_demo$choiceYou)
+data_demo$n_choiceMeStart <- as.numeric(gsub('\\W','',data_demo$choiceMeStart))
+data_demo$n_RT <- as.numeric(data_demo$RT)
+
+data_demo$f_wealthOther <- factor(data_demo$wealthOther, levels= levels(factor(data_demo$wealthOther)), 
+  labels = c('0.19','0.75','3.00'))
+data_demo$f_wealthPP <- factor(data_demo$wealthPP, levels= levels(factor(data_demo$wealthPP)), 
+  labels = c('0.19','0.75','3.00'))
+data_demo$game <- factor(data_demo$game)
+
+data_demo$distance <- as.numeric(as.character(data_demo$f_wealthPP)) - as.numeric(as.character(data_demo$f_wealthOther))
+
+data_demo$f_distance <- as.factor(data_demo$distance)
+data_demo$inequality <- 'equal'
+data_demo[data_demo$distance > 0,]$inequality <- 'advantageous'
+data_demo[data_demo$distance < 0,]$inequality <- 'disadvantageous'
+
+data_demo$c_houseIncome <- data_demo$n_houseIncome - mean(data_demo$n_houseIncome)
+data_demo$c_famIncome <- data_demo$n_famIncome - mean(data_demo$n_famIncome)
+data_demo$c_ownIncome <- data_demo$n_ownIncome - mean(data_demo$n_ownIncome)
+data_demo$c_SES <- data_demo$n_SES - mean(data_demo$n_SES)
+
+data_demo$n_choiceMeStart <- as.numeric(gsub(".*?([0-9]+).*", "\\1", data_demo$choiceMeStart))
+
+#Are there participants that never moved the slider?
+data_demo$moveslider <- 0
+data_demo[data_demo$n_choiceMe == data_demo$n_choiceMeStart, ]$moveslider <- 1
+
+#No, all good.
+check <- ddply(data_demo, .(Subject), summarise, movesliderTot = sum(moveslider))
+
+ddply(data_demo, .(f_order, f_wealthPP, f_wealthOther, game), summarise, mchoice = mean(n_choiceMe))
+#save(data_demoDistr, file = paste(wd,'data/distributors/data_demoDistr.Rda', sep = ''))
+
+
+```
+
+
+```{r write for spss}
+
+#Write data for SPSS
+#Distinguish between pots
+detach(package:Hmisc) #Plyr & Hmisc don't like each other
+spss <- ddply(data_demo, .(Subject, game, wealthOther, wealthPP, f_order), summarise, choice = mean(n_choiceYou))
+
+spss$condition <- paste(spss$game, spss$wealthPP, spss$wealthOther, sep = '_')
+
+
+spss_wideF <- spread(subset(spss, select = c('Subject', 'condition', 'f_order', 'choice')), condition, choice)
+
+spss <- merge(spss_wideF, demo_wide, by = ('Subject'))
+
+spss$comments <- gsub('\n','', spss$comments)
+spss$strategy1 <- gsub('\n','', spss$strategy1)
+spss$strategy2 <- gsub('\n','', spss$strategy2)
+spss$strategyEx <- gsub('\n','', spss$strategyEx)
+grepl('\n', spss$comments)
+grepl('\n', spss$strategy1)
+grepl('\n', spss$strategy2)
+grepl('\n', spss$strategyEx)
+
+#write.table(spss, paste(wd,'data/distributors/Distributors_spss.txt', sep = ''),qmethod = 'double', sep="\t", row.names=F, col.names=T)
+
+
+
+```
+
+
+```{r save distributors .Rda}
+
+#save(data_demo, file = paste(wd,'/data/Distributors/Distributors.rda', sep = ''))
+
+```
