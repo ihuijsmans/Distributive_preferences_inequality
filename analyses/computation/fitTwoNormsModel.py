@@ -51,7 +51,7 @@ print ('subject %s model %s' %(Subject,model))
 fitIters = np.zeros([niter,5])
 for i in range(niter):
 
-    #How to bound parameters?
+    #bound parameters
     param0 = np.array([scipy.random.uniform(),scipy.random.uniform()*0.5])
     fitIters[i,0:2] = param0
     
