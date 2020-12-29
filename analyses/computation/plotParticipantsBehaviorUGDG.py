@@ -53,6 +53,7 @@ filename = 'data_demo.csv'
 dat = pd.read_csv(os.path.join(data_dir,filename),index_col=None)
 
 clusterFit = True
+makePlots = True
 saveClusterToData = False
 
 saveFigs = False
@@ -136,6 +137,8 @@ if clusterFit:
     dataParamMaxDD = dataParamMax.loc[dataParamMax['game']=='DD',:].reset_index(drop=True)
     dataParamMaxUD = dataParamMax.loc[dataParamMax['game']=='UD',:].reset_index(drop=True)
     
+    
+if makePlots:    
 
     ### Plots
     
@@ -205,11 +208,7 @@ if clusterFit:
 
         ax.plot(xpoints,
                    ypoints,'-', color ='black', alpha = 0.15,label = '' )
-#    xpointsX = .5+dataParamMax['theta']/x_range*(x_num-1)+np.random.rand(1)
-#    ypointsX = .5+(y_start+dataParamMax['phi'])/y_range*(y_num-1)
-#    ax.scatter(xpointsX, ypointsX, color ='black', s = 200, 
-#               marker = '*', edgecolor = 'black', 
-#               label ='DG')
+
     xpointsX = .5+dataParamMaxDD['theta']/x_range*(x_num-1)+np.random.rand(1)
     ypointsX = .5+(y_start+dataParamMaxDD['phi'])/y_range*(y_num-1)
     ax.scatter(xpointsX, ypointsX, color ='black', s = 200, 
@@ -222,25 +221,7 @@ if clusterFit:
                label ='UG')
     ax.set_ylim([0, 100])
     ax.legend(scatterpoints = 1,loc=(1.04,0.1))
-    
-    
-#    markers = ['*','*','*','*']
-#    colors = sns.color_palette(fourcolors)
-#    colors = sns.color_palette(fourcolors)
-#    edgecolors = np.divide(colorMap,2)
-#    sizes = [200,200,200,200]
-#    for i in np.arange(1,5,1):
-#        listInd = i-1
-#        marker = markers[listInd]; color = colors[listInd];
-#        size = sizes[listInd]; edgecolor = edgecolors[listInd];
-#        print(i,marker,size)
-#        thetaCur = dataParamMax['theta'][dataParamMax['cluster']==i]
-#        phiCur = dataParamMax['phi'][dataParamMax['cluster']==i]
-#        ax.scatter(x=.5+thetaCur/x_range*(x_num-1)+np.random.rand(1),
-#                   y=.5+(y_start+phiCur)/y_range*(y_num-1),
-#                   marker=marker,color=color,edgecolor=edgecolor,s=size,lw=1)
-#           
-#        
+         
     figname = '%s/analyses/plots/Cluster_%i_ThetaPhi_UGDG.png' % (base_dir, nclusters)
     if saveFigs:
         plt.savefig(figname,bbox_inches='tight')
