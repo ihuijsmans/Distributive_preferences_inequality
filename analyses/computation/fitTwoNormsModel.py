@@ -29,23 +29,17 @@ game = str(sys.argv[4]) # This takes the game we are estimating
 #game = 'UD'
 
 # Load data
-
-
 dat = pd.read_csv(os.path.join(data_dir,filename),index_col=None)
-
 Subject = np.unique(dat['Subject'])[sub]
 subDat = dat.loc[dat['Subject']==Subject,:].reset_index(drop=True)
 subDat = subDat.loc[subDat['game']==game,:].reset_index(drop=True)
 subDat['choice'] = 1-subDat['choiceMe']
 
-print(subDat.groupby(['BP1', 'BP2'], as_index=False)['choice','expectations'].mean())
-
-
-print(Subject, niter, jobs_iteration, subDat.shape[0])
+#print(subDat.groupby(['BP1', 'BP2'], as_index=False)['choice','expectations'].mean())
+#print(Subject, niter, jobs_iteration, subDat.shape[0])
 
 
 # Fit
-residShareChoice=False
 results = pd.DataFrame(columns=['Subject','game','model','theta','phi','SSE','AIC','BIC'])
 
 
@@ -62,7 +56,7 @@ for i in range(niter):
     fitIters[i,0:2] = param0
     
     res_lsq = least_squares(costFunctions.two_norms_costfun, param0, args=(subDat,),
-                            kwargs={'printStep':False,'resid_share':residShareChoice},
+                            kwargs={'printStep':False},
                             #diff_step=.1,
                             #bounds=([0,1],[0,1]),
                             )
